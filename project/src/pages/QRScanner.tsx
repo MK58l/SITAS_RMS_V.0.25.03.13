@@ -176,34 +176,59 @@ const QRScanner = () => {
   };
 
   const sendOrderConfirmationEmail = (userEmail: string, order: any) => {
-    const orderItemsText = order.order_items
-      .map(
-        (item: any) =>
-          `${item.name} (x${item.quantity}) - $${(item.price * item.quantity).toFixed(2)}`
-      )
-      .join('\n');
+    // Generate order items table
+    const orderItemsTable = `
+      <table class="order-table" style="width: 100%; border-collapse: collapse; border: 1px solid #ddd;">
+        <thead>
+          <tr>
+            <th style="border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Item</th>
+            <th style="border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Quantity</th>
+            <th style="border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Price</th>
+            <th style="border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${order.order_items
+            .map(
+              (item: any) => `
+                <tr>
+                  <td style="border: 1px solid #ddd; padding: 8px;">${item.name}</td>
+                  <td style="border: 1px solid #ddd; padding: 8px;">${item.quantity}</td>
+                  <td style="border: 1px solid #ddd; padding: 8px;">₹${item.price.toFixed(2)}</td>
+                  <td style="border: 1px solid #ddd; padding: 8px;">₹${(item.price * item.quantity).toFixed(2)}</td>
+                </tr>
+              `
+            )
+            .join("")}
+        </tbody>
+      </table>
+    `;
   
     const emailParams = {
       user_email: userEmail,
       order_id: order.id,
-      total_amount: `$${order.total_amount.toFixed(2)}`,
-      name: user?.name || "Guest",
+      total_amount: `₹${order.total_amount.toFixed(2)}`,
+      name: order?.user?.name || "Guest",
       hotel_name: "Your Hotel Name",
       hotel_address: "Hotel Address",
       hotel_contact: "+91-XXXXXXXXXX",
-      order_items: orderItemsText
+      order_items_table: orderItemsTable, // Table is sent as HTML
     };
   
     emailjs
       .send(
-        'service_o51ew0e',
-        'template_0dntpue',
+        "service_o51ew0e",
+        "template_0dntpue",
         emailParams,
-        'Wq9LPEIYq_4-UHOkQ'
+        "Wq9LPEIYq_4-UHOkQ"
       )
-      .then(() => toast.success('Order confirmation email sent'))
-      .catch(() => toast.error('Failed to send confirmation email'));
+      .then(() => toast.success("Order confirmation email sent"))
+      .catch((error) => {
+        console.error("Email sending failed:", error);
+        toast.error("Failed to send confirmation email");
+      });
   };
+  
   
   // Redirect to login if not authenticated
   if (!isAuthenticated) return <Navigate to="/login" />;
@@ -267,7 +292,7 @@ const QRScanner = () => {
                         <h4 className="font-medium text-gray-900">{item.name}</h4>
                         <p className="text-sm text-gray-500 mt-1">{item.description}</p>
                         <div className="mt-4 flex items-center justify-between">
-                          <span className="font-bold">${item.price}</span>
+                          <span className="font-bold">₹{item.price}</span>
                           <button
                             onClick={() => addToCart(item)}
                             className="btn-primary"
@@ -315,7 +340,7 @@ const QRScanner = () => {
                           +
                         </button>
                         <span className="w-20 text-right">
-                          ${(item.price * item.quantity).toFixed(2)}
+                          ₹{(item.price * item.quantity).toFixed(2)}
                         </span>
                       </div>
                     </div>
@@ -328,7 +353,7 @@ const QRScanner = () => {
                   <div className="flex justify-between items-center mb-4">
                     <span className="font-medium">Total:</span>
                     <span className="font-bold text-xl">
-                      ${cart.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2)}
+                      ₹{cart.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2)}
                     </span>
                   </div>
 

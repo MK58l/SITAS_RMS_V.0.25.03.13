@@ -25,6 +25,8 @@ const MenuManagement = () => {
     description: '',
     sort_order: 0,
   });
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState('');
 
   useEffect(() => {
     fetchCategories();
@@ -126,40 +128,62 @@ const MenuManagement = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      if (!formData.name.trim()) {
-        throw new Error('Name is required');
-      }
+      if (!formData.name.trim()) throw new Error('Name is required');
+      if (!formData.price || isNaN(parseFloat(formData.price))) throw new Error('Valid price is required');
+      if (!formData.category_id) throw new Error('Category is required');
 
-      if (!formData.price || isNaN(parseFloat(formData.price))) {
-        throw new Error('Valid price is required');
-      }
-
-      if (!formData.category_id) {
-        throw new Error('Category is required');
-      }
-
-      // Verify that the category exists
+      // Verify category exists
       const { data: categoryExists } = await supabase
         .from('menu_categories')
         .select('id')
         .eq('id', formData.category_id)
         .single();
+      if (!categoryExists) throw new Error('Selected category does not exist');
 
-      if (!categoryExists) {
-        throw new Error('Selected category does not exist');
+      let imageUrl = formData.image_url;
+
+      // Handle file upload/removal
+      if (selectedFile) {
+        // Delete old image if editing
+        if (editingItem?.image_url) {
+          const oldImagePath = editingItem.image_url.split('/').pop();
+          const { error: deleteError } = await supabase.storage
+            .from('menu-items')
+            .remove([oldImagePath]);
+          if (deleteError) console.error('Error deleting old image:', deleteError);
+        }
+
+        // Upload new image
+        const fileName = `${Date.now()}_${selectedFile.name}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('menu-items')
+          .upload(fileName, selectedFile);
+
+        if (uploadError) throw uploadError;
+
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('menu-items')
+          .getPublicUrl(uploadData.path);
+        imageUrl = publicUrl;
+      } else if (editingItem && !formData.image_url && editingItem.image_url) {
+        // Handle image removal
+        const oldImagePath = editingItem.image_url.split('/').pop();
+        const { error: deleteError } = await supabase.storage
+          .from('menu-items')
+          .remove([oldImagePath]);
+        if (deleteError) console.error('Error deleting image:', deleteError);
+        imageUrl = '';
       }
 
       const menuItemData = {
         name: formData.name.trim(),
         description: formData.description?.trim() || null,
-        price: parseFloat(formData.price), // No conversion to cents
+        price: parseFloat(formData.price),
         category_id: formData.category_id,
-        image_url: formData.image_url?.trim() || null,
+        image_url: imageUrl,
         is_available: formData.is_available,
       };
-
-      console.log('Form Data before submission:', formData); // Debug: Check form data
-      console.log('Menu Item Data to be submitted:', menuItemData); // Debug: Check submitted data
 
       let response;
       if (editingItem) {
@@ -167,31 +191,19 @@ const MenuManagement = () => {
           .from('menu_items')
           .update(menuItemData)
           .eq('id', editingItem.id);
-
-        console.log('Update Response:', response); // Debug: Check update response
-
-        if (response.error) throw response.error;
-
-        // Update the local state immediately
-        setMenuItems((prevItems) =>
-          prevItems.map((item) =>
-            item.id === editingItem.id ? { ...item, ...menuItemData } : item
-          )
-        );
       } else {
         response = await supabase
           .from('menu_items')
           .insert([menuItemData]);
-
-        if (response.error) throw response.error;
-
-        // Fetch updated menu items after adding a new item
-        await fetchMenuItems();
       }
+
+      if (response.error) throw response.error;
 
       toast.success(editingItem ? 'Menu item updated' : 'Menu item added');
       setIsModalOpen(false);
       setEditingItem(null);
+      setSelectedFile(null);
+      setPreviewUrl('');
       setFormData({
         name: '',
         description: '',
@@ -200,14 +212,30 @@ const MenuManagement = () => {
         image_url: '',
         is_available: true,
       });
-
-      // Fetch updated menu items to ensure the local state is in sync
       await fetchMenuItems();
-      console.log('Updated Menu Items:', menuItems); // Debug: Check updated state
     } catch (error) {
       console.error('Error saving menu item:', error);
       toast.error(error.message || 'Failed to save menu item');
     }
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setPreviewUrl(reader.result);
+      reader.readAsDataURL(file);
+    } else {
+      setSelectedFile(null);
+      setPreviewUrl('');
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setSelectedFile(null);
+    setPreviewUrl('');
+    setFormData(prev => ({ ...prev, image_url: '' }));
   };
 
   const handleDelete = async (id) => {
@@ -524,18 +552,48 @@ const MenuManagement = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Image URL
-            </label>
-            <input
-              type="url"
-              value={formData.image_url}
-              onChange={(e) =>
-                setFormData({ ...formData, image_url: e.target.value })
-              }
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            />
-          </div>
+    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+      Image
+    </label>
+    <input
+      type="file"
+      accept="image/*"
+      onChange={handleFileChange}
+      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+    />
+    {previewUrl && (
+      <div className="mt-2">
+        <img
+          src={previewUrl}
+          alt="Preview"
+          className="h-32 w-32 object-cover rounded"
+        />
+        <button
+          type="button"
+          onClick={handleRemoveImage}
+          className="mt-2 text-sm text-red-600 hover:text-red-800"
+        >
+          Remove image
+        </button>
+      </div>
+    )}
+    {editingItem?.image_url && !previewUrl && (
+      <div className="mt-2">
+        <img
+          src={editingItem.image_url}
+          alt="Current"
+          className="h-32 w-32 object-cover rounded"
+        />
+        <button
+          type="button"
+          onClick={handleRemoveImage}
+          className="mt-2 text-sm text-red-600 hover:text-red-800"
+        >
+          Remove image
+        </button>
+      </div>
+    )}
+  </div>
 
           <div className="flex items-center">
             <input

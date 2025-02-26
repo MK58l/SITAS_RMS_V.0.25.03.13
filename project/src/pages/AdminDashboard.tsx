@@ -30,6 +30,11 @@ const AdminDashboard = () => {
     fetchDashboardData();
   }, []);
 
+  // Log the tables state whenever it changes
+  useEffect(() => {
+    console.log('Tables state updated:', tables);
+  }, [tables]);
+
   const fetchDashboardData = async () => {
     try {
       // Fetch revenue data
@@ -113,6 +118,28 @@ const AdminDashboard = () => {
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       setLoading(false);
+    }
+  };
+
+  const updateTableStatus = async (tableId, newStatus) => {
+    console.log('Updating table status:', tableId, newStatus); // Debugging line
+    try {
+      // Update the table status in the database
+      const { data, error } = await supabase
+        .from('tables')
+        .update({ status: newStatus })
+        .eq('id', tableId);
+
+      if (error) throw error;
+
+      // Update the local state immediately
+      setTables((prevTables) =>
+        prevTables.map((table) =>
+          table.id === tableId ? { ...table, status: newStatus } : table
+        )
+      );
+    } catch (error) {
+      console.error('Error updating table status:', error);
     }
   };
 

@@ -47,7 +47,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       if (error) throw error;
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error(error.message || 'Login failed');
       throw error;
     }
   };
@@ -57,7 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error(error.message || 'Logout failed');
       throw error;
     }
   };

@@ -7,15 +7,15 @@ export default defineConfig({
     exclude: ['lucide-react'],
   },
   server: {
-    host: true,
-    port: 5173,
-    strictPort: true,
+    host: true,  // Ensure external access if needed
+    port: 5176,  // Set to 5173 as you want
+    strictPort: true,  // Ensures it uses the exact port
     hmr: {
-      clientPort: 443
-    }
+      clientPort: 443,  // Custom HMR port
+    },
   },
   preview: {
-    port: 5173,
+    port: 5176,  // Ensure preview also runs on port 5173
     strictPort: true,
     host: true,
   }

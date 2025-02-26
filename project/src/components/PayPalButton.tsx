@@ -1,42 +1,42 @@
-import React, { useEffect } from 'react';
-import { PayPalScriptProvider } from '@paypal/react-paypal-js';
-import { PayPalButtons } from '@paypal/react-paypal-js';
+import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';
 
-interface PayPalButtonProps {
+const PayPalButton = ({ amount, onSuccess, onError }: { 
   amount: number;
   onSuccess: (details: any) => void;
   onError: (error: any) => void;
-}
+}) => {
+  const CLIENT_ID = import.meta.env.VITE_PAYPAL_CLIENT_ID; // Use import.meta.env
 
-const PayPalButton: React.FC<PayPalButtonProps> = ({ amount, onSuccess, onError }) => {
+  if (!CLIENT_ID) {
+    console.error('PayPal Client ID is missing. Check your .env file.');
+    return <div>PayPal integration is currently unavailable.</div>;
+  }
+
   return (
-    <PayPalScriptProvider options={{ 
-      clientId: import.meta.env.VITE_PAYPAL_CLIENT_ID,
-      currency: "USD"
-    }}>
+    <PayPalScriptProvider 
+      options={{ 
+        'client-id': CLIENT_ID,
+        currency: 'USD',
+        intent: 'capture'
+      }}
+    >
       <PayPalButtons
-        style={{ layout: "vertical" }}
-        createOrder={(data, actions) => {
-          return actions.order.create({
-            purchase_units: [
-              {
-                amount: {
-                  value: amount.toString(),
-                  currency_code: "USD"
-                },
-              },
-            ],
-          });
-        }}
-        onApprove={async (data, actions) => {
-          if (actions.order) {
-            const details = await actions.order.capture();
-            onSuccess(details);
-          }
-        }}
-        onError={(err) => {
-          onError(err);
-        }}
+        style={{ layout: 'vertical' }}
+        createOrder={(_, actions) => actions.order.create({
+          purchase_units: [{
+            amount: {
+              value: amount.toFixed(2),
+              breakdown: {
+                item_total: {
+                  value: amount.toFixed(2),
+                  currency_code: 'USD'
+                }
+              }
+            }
+          }]
+        })}
+        onApprove={(_, actions) => actions.order!.capture().then(onSuccess)}
+        onError={onError}
       />
     </PayPalScriptProvider>
   );

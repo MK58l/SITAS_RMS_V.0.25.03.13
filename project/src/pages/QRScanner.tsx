@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { QrCode, ShoppingCart } from 'lucide-react';
 import PayPalButton from '../components/PayPalButton';
+import emailjs from '@emailjs/browser';
+import QRCode from 'react-qr-code';
 
 const QRScanner = () => {
   const { isAuthenticated, supabase, user } = useAuth();
-  const [scanning, setScanning] = useState(false);
-  const [tableId, setTableId] = useState<number | null>(null);
+  const [tableId, setTableId] = useState<string | null>(null);
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const [cart, setCart] = useState<any[]>([]);
   const [tables, setTables] = useState<any[]>([]);
@@ -16,371 +16,350 @@ const QRScanner = () => {
   const [showPayPal, setShowPayPal] = useState(false);
   const [currentOrder, setCurrentOrder] = useState<any>(null);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
+  // Fetch available tables and check for QR code parameter
   useEffect(() => {
-    fetchAvailableTables();
+    const fetchTablesAndCheckQR = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('tables')
+          .select('*')
+          .eq('status', 'available');
+        
+        if (error) throw error;
+        setTables(data || []);
+
+        // Check for table parameter in URL
+        const tableNumber = searchParams.get('table');
+        if (tableNumber && data) {
+          const selectedTable = data.find((t: any) => t.table_number === tableNumber);
+          if (selectedTable) {
+            handleTableSelection(selectedTable);
+            navigate('/qr-scanner', { replace: true }); // Clean URL after selection
+          }
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        toast.error('Failed to load tables');
+      }
+    };
+
+    fetchTablesAndCheckQR();
   }, []);
 
-  useEffect(() => {
-    if (tableId) {
-      fetchMenuItems();
-    }
-  }, [tableId]);
-
-  const fetchAvailableTables = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('tables')
-        .select('*')
-        .eq('status', 'available');
-
-      if (error) throw error;
-      setTables(data || []);
-    } catch (error) {
-      console.error('Error fetching available tables:', error);
-      toast.error('Failed to load available tables');
-    }
+  // Handle table selection
+  const handleTableSelection = (table: any) => {
+    setTableId(table.id);
+    setTables(prev => prev.filter(t => t.id !== table.id));
+    toast.success(`Table ${table.table_number} selected`);
+    fetchMenuItems();
   };
 
+  // Fetch menu items
   const fetchMenuItems = async () => {
     try {
       const { data, error } = await supabase
         .from('menu_items')
-        .select(`
-          *,
-          category:category_id (
-            name,
-            sort_order
-          )
-        `)
-        .eq('is_available', true)
-        .order('category_id');
-
+        .select('*')
+        .eq('is_available', true);
+      
       if (error) throw error;
       setMenuItems(data || []);
     } catch (error) {
-      console.error('Error fetching menu items:', error);
-      toast.error('Failed to load menu items');
+      console.error('Error fetching menu:', error);
+      toast.error('Failed to load menu');
     }
   };
 
-  const handleQRScan = async (qrData: { data: string }) => {
-    try {
-      const tableNumber = qrData.data.split('_')[1];
-      const table = tables.find(t => t.table_number === tableNumber);
-
-      if (table) {
-        setTableId(table.id);
-        setScanning(false);
-        toast.success(`Connected to Table ${tableNumber}`);
-        setTables(prevTables => prevTables.filter(t => t.id !== table.id));
-      } else {
-        toast.error('Invalid or unavailable table');
-        setScanning(false);
-      }
-    } catch (error) {
-      console.error('Error processing QR code:', error);
-      toast.error('Invalid QR code');
-      setScanning(false);
-    }
-  };
-
-  const handleTableSelect = (table: any) => {
-    setTableId(table.id);
-    setTables(prevTables => prevTables.filter(t => t.id !== table.id));
-    toast.success(`Connected to Table ${table.table_number}`);
-  };
-
+  // Add item to cart
   const addToCart = (item: any) => {
     setCart(prev => {
       const existing = prev.find(i => i.id === item.id);
-      if (existing) {
-        return prev.map(i =>
-          i.id === item.id
-            ? { ...i, quantity: i.quantity + 1 }
-            : i
-        );
-      }
-      return [...prev, { ...item, quantity: 1 }];
+      return existing
+        ? prev.map(i => (i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i))
+        : [...prev, { ...item, quantity: 1 }];
     });
-    toast.success(`Added ${item.name} to cart`);
+    toast.success(`Added ${item.name}`);
   };
 
-  const removeFromCart = (itemId: number) => {
-    setCart(prev => prev.filter(item => item.id !== itemId));
-  };
-
-  const updateQuantity = (itemId: number, quantity: number) => {
-    if (quantity < 1) return;
+  // Update item quantity in cart
+  const updateQuantity = (itemId: number, delta: number) => {
     setCart(prev =>
       prev.map(item =>
         item.id === itemId
-          ? { ...item, quantity }
+          ? { ...item, quantity: Math.max(1, item.quantity + delta) }
           : item
       )
     );
   };
 
+  // Remove item from cart
+  const removeFromCart = (itemId: number) => {
+    setCart(prev => prev.filter(item => item.id !== itemId));
+  };
+
+  // Place order
+  const placeOrder = async () => {
+    if (!tableId || !user?.id || cart.length === 0) {
+      toast.error('Complete your order setup');
+      return;
+    }
+  
+    try {
+      setIsPlacingOrder(true);
+
+      const { data: order, error } = await supabase
+        .from('orders')
+        .insert([{
+          table_id: tableId,
+          user_id: user.id,
+          total_amount: cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
+          status: 'pending',
+          payment_status: 'unpaid',
+          order_items: cart.map(item => ({
+            menu_item_id: item.id,
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price
+          }))
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setCurrentOrder(order);
+      setShowPayPal(true);
+      toast.success('Order registered! Complete the payment process...');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to place order');
+    } finally {
+      setIsPlacingOrder(false);
+    }
+  };
+
+  // Updated payment success handler
   const handlePaymentSuccess = async (details: any) => {
     try {
-      if (!currentOrder) return;
+      if (!currentOrder) throw new Error('No active order');
+      if (!user?.email) throw new Error('User email not found');
 
-      // Update order with payment details
-      const { error: updateError } = await supabase
+      // Update order status
+      const { error } = await supabase
         .from('orders')
         .update({
-          payment_status: 'completed',
           payment_id: details.id,
-          payment_details: details
+          payment_status: 'paid',
+          status: 'confirmed'
         })
         .eq('id', currentOrder.id);
 
-      if (updateError) throw updateError;
+      if (error) throw error;
 
-      toast.success('Payment successful! Your order has been confirmed.');
+      // Send confirmation email ONLY after successful payment
+      sendOrderConfirmationEmail(user.email, currentOrder);
+
+      // Clear cart and navigate
       setCart([]);
       setShowPayPal(false);
-      setCurrentOrder(null);
-      navigate('/orders');
-    } catch (error) {
-      console.error('Error updating payment status:', error);
-      toast.error('Error confirming payment. Please contact support.');
+      navigate('/order-confirmation', { state: { order: currentOrder } });
+      toast.success('Payment successful!');
+    } catch (error: any) {
+      toast.error(error.message || 'Payment update failed');
     }
   };
 
   const handlePaymentError = (error: any) => {
-    console.error('Payment error:', error);
-    toast.error('Payment failed. Please try again.');
+    toast.error('Payment failed');
     setShowPayPal(false);
   };
 
-const placeOrder = async () => {
-  console.log('Placing order...');
-  console.log('Table ID:', tableId);
-  console.log('Table ID Type:', typeof tableId);
-
-  if (!tableId || cart.length === 0) {
-    toast.error('Please add items to your cart before placing an order');
-    return;
-  }
-
-  if (!user?.id) {
-    toast.error('You must be logged in to place an order');
-    return;
-  }
-
-  if (isPlacingOrder) return;
-
-  try {
-    setIsPlacingOrder(true);
-    console.log('Checking if table exists in database...');
-
-    // 🔍 Ensure `table_id` exists
-    const { data: tableExists, error: tableError } = await supabase
-      .from('tables')
-      .select('id')
-      .eq('id', tableId.trim()) // 🔹 Ensure no spaces or encoding issues
-      .single();
-
-    console.log('Table Exists:', tableExists);
-
-    if (!tableExists || tableError) {
-      toast.error('Invalid or unavailable table');
-      setIsPlacingOrder(false);
-      return;
-    }
-
-    // 🔹 Force UUID Format
-    const formattedTableId = tableId.trim(); 
-    console.log('Formatted Table ID:', formattedTableId);
-
-    // 🔹 Insert Order
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .insert([
-        {
-          table_id: formattedTableId, // 🔹 Ensure table_id is correct
-          user_id: user.id,
-          total_amount: cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
-          status: 'pending',
-          payment_status: 'pending',
-          preparation_status: 'pending',
-          created_at: new Date().toISOString(),
-        },
-      ])
-      .select()
-      .single();
-
-    if (orderError) throw orderError;
-
-    console.log('Order placed successfully:', order);
-
-    setCurrentOrder(order);
-    setShowPayPal(true);
-  } catch (error: any) {
-    console.error('Error placing order:', error);
-    toast.error(error.message || 'Failed to place order.');
-    setShowPayPal(false);
-  } finally {
-    setIsPlacingOrder(false);
-  }
-};
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" />;
-  }
+  const sendOrderConfirmationEmail = (userEmail: string, order: any) => {
+    const orderItemsText = order.order_items
+      .map(
+        (item: any) =>
+          `${item.name} (x${item.quantity}) - $${(item.price * item.quantity).toFixed(2)}`
+      )
+      .join('\n');
+  
+    const emailParams = {
+      user_email: userEmail,
+      order_id: order.id,
+      total_amount: `$${order.total_amount.toFixed(2)}`,
+      name: user?.name || "Guest",
+      hotel_name: "Your Hotel Name",
+      hotel_address: "Hotel Address",
+      hotel_contact: "+91-XXXXXXXXXX",
+      order_items: orderItemsText
+    };
+  
+    emailjs
+      .send(
+        'service_o51ew0e',
+        'template_0dntpue',
+        emailParams,
+        'Wq9LPEIYq_4-UHOkQ'
+      )
+      .then(() => toast.success('Order confirmation email sent'))
+      .catch(() => toast.error('Failed to send confirmation email'));
+  };
+  
+  // Redirect to login if not authenticated
+  if (!isAuthenticated) return <Navigate to="/login" />;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
+    <div className="min-h-screen bg-gray-50 py-12 pt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {!tableId ? (
           <div className="max-w-3xl mx-auto">
             <div className="bg-white rounded-lg shadow px-6 py-8 text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Scan Table QR Code</h2>
-              <div className="space-y-6">
-                <p className="text-gray-500">
-                  Scan the QR code on your table to start ordering.
-                </p>
-
-                <div className="border-4 border-dashed border-gray-200 rounded-lg h-64 flex items-center justify-center">
-                  {scanning ? (
-                    <div className="text-gray-500">Scanning...</div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">
+                Scan Table QR Code to Start Ordering
+              </h2>
+              
+              <div className="mt-8">
+                <h3 className="text-xl font-medium text-gray-900 mb-4">
+                  Available Tables
+                </h3>
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                  {tables.length > 0 ? (
+                    tables.map(table => (
+                      <div key={table.id} className="text-center">
+                        <div className="bg-white p-2 rounded-lg mb-2">
+                          <QRCode
+                            value={`${window.location.origin}/qr-scanner?table=${table.table_number}`}
+                            size={128}
+                          />
+                        </div>
+                        <button
+                          onClick={() => handleTableSelection(table)}
+                          className="btn-primary"
+                        >
+                          Table {table.table_number}
+                        </button>
+                      </div>
+                    ))
                   ) : (
-                    <button
-                      onClick={() => {
-                        setScanning(true);
-                        setTimeout(() => {
-                          handleQRScan({ data: 'table_1' });
-                        }, 1000);
-                      }}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
-                    >
-                      <QrCode className="h-5 w-5 mr-2" />
-                      Start Scanning
-                    </button>
+                    <p className="text-gray-500">No tables available</p>
                   )}
-                </div>
-                <div className="mt-4">
-                  <h3 className="text-xl font-medium text-gray-900">Or select a table</h3>
-                  <div className="mt-2 space-y-2 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                    {tables.map(table => (
-                      <button
-                        key={table.id}
-                        onClick={() => handleTableSelect(table)}
-                        className="w-full text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-md"
-                      >
-                        Table {table.table_number}
-                      </button>
-                    ))}
-                  </div>
                 </div>
               </div>
             </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Menu Section */}
             <div className="lg:col-span-2">
               <div className="bg-white shadow rounded-lg p-6">
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Menu</h2>
-                {Object.entries(
-                  menuItems.reduce((acc, item) => {
-                    const category = item.category?.name || 'Other';
-                    if (!acc[category]) acc[category] = [];
-                    acc[category].push(item);
-                    return acc;
-                  }, {})
-                ).map(([category, items]) => (
-                  <div key={category} className="mb-8">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">{category}</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {items.map((item: any) => (
-                        <div key={item.id} className="border rounded-lg p-4">
-                          {item.image_url && (
-                            <img
-                              src={item.image_url}
-                              alt={item.name}
-                              className="w-full h-48 object-cover rounded-lg mb-4"
-                            />
-                          )}
-                          <h4 className="font-medium text-gray-900">{item.name}</h4>
-                          <p className="text-sm text-gray-500 mt-1">{item.description}</p>
-                          <div className="mt-4 flex items-center justify-between">
-                            <span className="font-bold text-lg">${item.price}</span>
-                            <button
-                              onClick={() => addToCart(item)}
-                              className="bg-indigo-600 text-white rounded-full px-4 py-2 hover:bg-indigo-700"
-                            >
-                              Add to Cart
-                            </button>
-                          </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {menuItems.length > 0 ? (
+                    menuItems.map(item => (
+                      <div key={item.id} className="border rounded-lg p-4">
+                        {item.image_url && (
+                          <img
+                            src={item.image_url}
+                            alt={item.name}
+                            className="w-full h-48 object-cover rounded-lg mb-4"
+                          />
+                        )}
+                        <h4 className="font-medium text-gray-900">{item.name}</h4>
+                        <p className="text-sm text-gray-500 mt-1">{item.description}</p>
+                        <div className="mt-4 flex items-center justify-between">
+                          <span className="font-bold">${item.price}</span>
+                          <button
+                            onClick={() => addToCart(item)}
+                            className="btn-primary"
+                          >
+                            Add to Cart
+                          </button>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-gray-500">No menu items available</p>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="bg-white shadow rounded-lg p-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Your Cart</h2>
+            {/* Cart Section */}
+            <div className="bg-white shadow rounded-lg p-6 h-fit sticky top-24">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Your Order</h2>
               <div className="space-y-4">
-                {cart.map(item => (
-                  <div key={item.id} className="flex justify-between items-center">
-                    <div className="flex items-center">
-                      <button
-                        onClick={() => removeFromCart(item.id)}
-                        className="text-red-600 hover:text-red-700 mr-2"
-                      >
-                        &times;
-                      </button>
-                      <span className="text-gray-900">{item.name}</span>
+                {cart.length > 0 ? (
+                  cart.map(item => (
+                    <div key={item.id} className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => removeFromCart(item.id)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          ×
+                        </button>
+                        <span className="text-gray-900">{item.name}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => updateQuantity(item.id, -1)}
+                          className="quantity-button"
+                        >
+                          -
+                        </button>
+                        <span>{item.quantity}</span>
+                        <button
+                          onClick={() => updateQuantity(item.id, 1)}
+                          className="quantity-button"
+                        >
+                          +
+                        </button>
+                        <span className="w-20 text-right">
+                          ${(item.price * item.quantity).toFixed(2)}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center">
-                      <button
-                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                        className="text-gray-500 hover:text-gray-700 mr-2"
-                      >
-                        -
-                      </button>
-                      <span>{item.quantity}</span>
-                      <button
-                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                        className="text-gray-500 hover:text-gray-700 ml-2"
-                      >
-                        +
-                      </button>
-                    </div>
-                    <span>${(item.price * item.quantity).toFixed(2)}</span>
-                  </div>
-                ))}
-                <div className="flex justify-between items-center mt-4">
-                  <span className="font-medium text-gray-900">Total</span>
-                  <span className="font-bold text-xl">
-                    ${cart.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2)}
-                  </span>
-                </div>
-                
-                {showPayPal ? (
-                  <div className="mt-6">
-                    <PayPalButton
-                      amount={cart.reduce((total, item) => total + (item.price * item.quantity), 0)}
-                      onSuccess={handlePaymentSuccess}
-                      onError={handlePaymentError}
-                    />
-                  </div>
+                  ))
                 ) : (
-                  <button
-                    onClick={placeOrder}
-                    disabled={isPlacingOrder || cart.length === 0}
-                    className={`w-full mt-6 ${
-                      isPlacingOrder || cart.length === 0
-                        ? 'bg-gray-400 cursor-not-allowed'
-                        : 'bg-indigo-600 hover:bg-indigo-700'
-                    } text-white py-3 rounded-md text-lg transition-colors`}
-                  >
-                    {isPlacingOrder ? 'Processing...' : 'Place Order'}
-                  </button>
+                  <p className="text-gray-500">Your cart is empty</p>
                 )}
+
+                <div className="border-t pt-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="font-medium">Total:</span>
+                    <span className="font-bold text-xl">
+                      ${cart.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2)}
+                    </span>
+                  </div>
+
+                  {showPayPal ? (
+                    <div className="space-y-4">
+                      <PayPalButton
+                        amount={cart.reduce((sum, item) => sum + item.price * item.quantity, 0)}
+                        onSuccess={handlePaymentSuccess}
+                        onError={handlePaymentError}
+                      />
+                      <button
+                        onClick={() => setShowPayPal(false)}
+                        className="w-full text-white-600 underline hover:text-white-800 text-sm"
+                      >
+                        Cancel Payment
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={placeOrder}
+                      disabled={isPlacingOrder || cart.length === 0}
+                      className={`w-full btn-primary ${
+                        isPlacingOrder || cart.length === 0
+                          ? 'opacity-50 cursor-not-allowed'
+                          : ''
+                      }`}
+                    >
+                      {isPlacingOrder ? 'Processing...' : 'Proceed to Payment'}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>

@@ -15,6 +15,8 @@ import QRScanner from './pages/QRScanner';
 import MenuManagement from './pages/admin/MenuManagement';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { Chatbot } from './components/Chatbot/Chatbot';
+import OrderConfirmation from './pages/OrderConfirmation';
 
 function App() {
   return (
@@ -34,6 +36,8 @@ function App() {
               <Route path="/menu" element={<MenuPage />} />
               <Route path="/book-table" element={<TableBooking />} />
               <Route path="/scan-qr" element={<QRScanner />} />
+              <Route path="/admin/menu" element={<MenuManagement />} />
+              <Route path="/order-confirmation" element={<OrderConfirmation />} />
             </Routes>
             <Toaster 
               position="top-center"
@@ -41,6 +45,7 @@ function App() {
                 className: 'dark:bg-gray-800 dark:text-white',
               }}
             />
+            <Chatbot />
           </div>
         </Router>
       </AuthProvider>
@@ -48,4 +53,4 @@ function App() {
   );
 }
 
-export default App
+export default App;

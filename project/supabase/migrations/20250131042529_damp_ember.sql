@@ -208,3 +208,6 @@ CREATE POLICY "Users can create order items"
       AND orders.user_id = auth.uid()
     )
   );
+
+ALTER TABLE orders
+ADD COLUMN payment_id TEXT;

@@ -1,3 +1,255 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+/* Custom scrollbar for webkit browsers */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #666;
+}
+
+html {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.dark {
+  background-color: #1a202c;
+  color: #f7fafc;
+}
+
+/* Add this CSS to your global styles or a separate CSS file */
+
+/* Button Styles */
+.btn-primary {
+  background-color: #4F46E5; /* Primary color */
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn-primary:hover {
+  background-color: #4338CA; /* Darker shade for hover */
+  transform: translateY(-1px);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  background-color: #E0E7FF; /* Light background for secondary buttons */
+  color: #4F46E5; /* Primary color for text */
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background-color: #C7D2FE; /* Slightly darker shade for hover */
+  transform: translateY(-1px);
+}
+
+.btn-secondary:active {
+  transform: translateY(0);
+}
+
+/* Cart Item Styles */
+.cart-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  background-color: #F9FAFB; /* Light background for cart items */
+  margin-bottom: 0.5rem;
+}
+
+.cart-item:hover {
+  background-color: #F3F4F6; /* Slightly darker shade for hover */
+}
+
+.cart-item button {
+  background-color: #EF4444; /* Red color for remove button */
+  color: white;
+  border-radius: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  transition: background-color 0.3s ease;
+}
+
+.cart-item button:hover {
+  background-color: #DC2626; /* Darker shade for hover */
+}
+
+/* Menu Item Styles */
+.menu-item {
+  border: 1px solid #E5E7EB; /* Light border for menu items */
+  border-radius: 0.5rem;
+  overflow: hidden;
+  transition: box-shadow 0.3s ease;
+}
+
+.menu-item:hover {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Shadow effect on hover */
+}
+
+.menu-item img {
+  transition: transform 0.3s ease;
+}
+
+.menu-item:hover img {
+  transform: scale(1.05); /* Slight zoom effect on hover */
+}
+
+/* PayPal Button Container */
+.paypal-container {
+  background-color: #F9FAFB; /* Light background for PayPal container */
+  padding: 1rem;
+  border-radius: 0.5rem;
+  margin-top: 1rem;
+}
+
+/* General Layout Improvements */
+.max-w-3xl {
+  max-width: 48rem;
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.shadow {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.rounded-lg {
+  border-radius: 0.5rem;
+}
+
+/* Dark Mode Adjustments */
+/* Light mode styles */
+body {
+  background-color: #ffffff;
+  color: #000000;
+}
+
+/* Dark mode styles */
+.dark body {
+  background-color: #1a202c;
+  color: #ffffff;
+}
+
+.dark .bg-white {
+  background-color: #2d3748;
+}
+
+.dark .text-gray-900 {
+  color: #e2e8f0;
+}
+
+.dark .text-gray-500 {
+  color: #a0aec0;
+}
+
+.dark .border-gray-200 {
+  border-color: #4a5568;
+}
+
+.dark .bg-gray-50 {
+  background-color: #1a202c;
+}
+
+.dark .btn-primary {
+  background-color: #4c51bf;
+  color: #ffffff;
+}
+
+.dark .btn-secondary {
+  background-color: #2d3748;
+  color: #e2e8f0;
+}
+
+.dark .cart-item {
+  background-color: #2d3748;
+}
+
+.dark .menu-item {
+  border-color: #4a5568;
+}
+
+.dark .paypal-container {
+  background-color: #2d3748;
+}
+
+/* Light mode styles for quantity adjustment buttons */
+.quantity-button {
+  background-color: #f3f4f6; /* Light gray background */
+  color: #374151; /* Dark gray text */
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  transition: background-color 0.3s ease;
+}
+
+.quantity-button:hover {
+  background-color: #e5e7eb; /* Slightly darker gray on hover */
+}
+
+/* Dark mode styles for quantity adjustment buttons */
+.dark .quantity-button {
+  background-color: #4a5568; /* Dark gray background */
+  color: #e2e8f0; /* Light gray text */
+}
+
+.dark .quantity-button:hover {
+  background-color: #2d3748; /* Slightly darker gray on hover */
+}

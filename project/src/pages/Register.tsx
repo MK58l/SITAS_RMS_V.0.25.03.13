@@ -36,10 +36,12 @@ const Register = () => {
 
       toast.success('Registration successful! Please sign in.');
       navigate('/login');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to register');
-    } finally {
-      setIsLoading(false);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        toast.error(error.message || 'Failed to register');
+      } else {
+        toast.error('An unknown error occurred');
+      }
     }
   };
 

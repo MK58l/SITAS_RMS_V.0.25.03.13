@@ -5,6 +5,7 @@ const MenuPage = () => {
   const { supabase } = useAuth();
   const [menuItems, setMenuItems] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
+  const [expandedCategories, setExpandedCategories] = React.useState<Record<string, boolean>>({});
 
   React.useEffect(() => {
     const fetchMenuItems = async () => {
@@ -37,6 +38,13 @@ const MenuPage = () => {
     }).format(price);
   };
 
+  const toggleCategory = (category: string) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [category]: !prev[category]
+    }));
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
@@ -45,7 +53,6 @@ const MenuPage = () => {
     );
   }
 
-  // Group menu items by category
   const groupedMenuItems = menuItems.reduce((acc, item) => {
     const categoryName = item.category?.name || 'Other';
     if (!acc[categoryName]) {
@@ -60,40 +67,60 @@ const MenuPage = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-8">Our Menu</h1>
         
-        {Object.entries(groupedMenuItems).map(([category, items]) => (
-          <div key={category} className="mb-12">
-            <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-6">{category}</h2>
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {items.map((item: any) => (
-                <div key={item.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-                  {item.image_url && (
-                    <img
-                      src={item.image_url}
-                      alt={item.name}
-                      className="w-full h-48 object-cover"
-                    />
-                  )}
-                  <div className="p-4">
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">{item.name}</h3>
-                    <p className="mt-2 text-gray-500 dark:text-gray-300 text-sm">{item.description}</p>
-                    <div className="mt-4 flex items-center justify-between">
-                      <span className="text-xl font-bold text-gray-900 dark:text-gray-100">{formatPrice(item.price)}</span>
-                      {item.is_available ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-700 text-green-800 dark:text-green-200">
-                          Available
+        {Object.entries(groupedMenuItems).map(([category, items]) => {
+          const showAll = expandedCategories[category];
+          const displayItems = showAll ? items : items.slice(0, 3);
+          const hasMoreItems = items.length > 3;
+
+          return (
+            <div key={category} className="mb-12">
+              <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-6">
+                {category}
+              </h2>
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {displayItems.map((item: any) => (
+                  <div key={item.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+                    {item.image_url && (
+                      <img
+                        src={item.image_url}
+                        alt={item.name}
+                        className="w-full h-48 object-cover"
+                      />
+                    )}
+                    <div className="p-4">
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">{item.name}</h3>
+                      <p className="mt-2 text-gray-500 dark:text-gray-300 text-sm">{item.description}</p>
+                      <div className="mt-4 flex items-center justify-between">
+                        <span className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                          {formatPrice(item.price)}
                         </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-700 text-red-800 dark:text-red-200">
-                          Sold Out
-                        </span>
-                      )}
+                        {item.is_available ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-700 text-green-800 dark:text-green-200">
+                            Available
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-700 text-red-800 dark:text-red-200">
+                            Sold Out
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
+                ))}
+              </div>
+              {hasMoreItems && (
+                <div className="mt-6 text-center">
+                  <button
+                    onClick={() => toggleCategory(category)}
+                    className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200"
+                  >
+                    {showAll ? 'View Less' : `View More (${items.length - 3})`}
+                  </button>
                 </div>
-              ))}
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

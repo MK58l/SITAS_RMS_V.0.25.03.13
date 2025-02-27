@@ -208,12 +208,13 @@ const QRScanner = () => {
       user_email: userEmail,
       order_id: order.id,
       total_amount: `₹${order.total_amount.toFixed(2)}`,
-      name: order?.user?.name || "Guest",
+      name: order?.user?.name && order.user.name.trim() !== "" ? order.user.name : "Valued Customer",
       hotel_name: "Your Hotel Name",
       hotel_address: "Hotel Address",
       hotel_contact: "+91-XXXXXXXXXX",
       order_items_table: orderItemsTable, // Table is sent as HTML
     };
+    
   
     emailjs
       .send(

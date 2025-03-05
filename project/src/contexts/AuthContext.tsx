@@ -26,10 +26,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (session?.user) {
         setUser(session.user);
         setIsAuthenticated(true);
-        toast.success(`Welcome back, ${session.user.email}!`);
+        if (!localStorage.getItem('toastShown')) {
+          toast.success(`Welcome back, ${session.user.email}!`);
+          localStorage.setItem('toastShown', 'true');
+        }
       } else {
         setUser(null);
         setIsAuthenticated(false);
+        localStorage.removeItem('toastShown');
       }
     });
 

@@ -27,6 +27,7 @@ const MenuManagement = () => {
   });
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
+  const [expandedCategories, setExpandedCategories] = useState({});
 
   useEffect(() => {
     fetchCategories();
@@ -52,17 +53,11 @@ const MenuManagement = () => {
     try {
       const { data, error } = await supabase
         .from('menu_items')
-        .select(
-          `*,
-          menu_categories (
-            name
-          )`
-        )
+        .select('*')
         .order('name');
 
       if (error) throw error;
       setMenuItems(data);
-      console.log('Fetched Menu Items:', data.map(item => ({ id: item.id, name: item.name, price: item.price }))); // Debug: Check price values
     } catch (error) {
       console.error('Error fetching menu items:', error);
       toast.error('Failed to fetch menu items');
@@ -70,15 +65,20 @@ const MenuManagement = () => {
   };
 
   const formatPrice = (price) => {
-    console.log('Price value received:', price); // Debug: Check input price value
     const formattedPrice = new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
-      maximumFractionDigits: 0, // Adjust this if you want to display decimal places
-    }).format(price); // No division by 100 needed
+      maximumFractionDigits: 0,
+    }).format(price);
 
-    console.log('Formatted Price:', formattedPrice); // Debug: Check formatted price
     return formattedPrice;
+  };
+
+  const toggleCategory = (categoryId) => {
+    setExpandedCategories((prev) => ({
+      ...prev,
+      [categoryId]: !prev[categoryId],
+    }));
   };
 
   const handleCategorySubmit = async (e) => {
@@ -321,7 +321,7 @@ const MenuManagement = () => {
     }
   };
 
-  return (
+return (
     <div className="container mx-auto px-4 py-8 pt-20">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -370,7 +370,10 @@ const MenuManagement = () => {
             key={category.id}
             className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden"
           >
-            <div className="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <div
+              className="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center cursor-pointer"
+              onClick={() => toggleCategory(category.id)}
+            >
               <div>
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white">
                   {category.name}
@@ -381,7 +384,8 @@ const MenuManagement = () => {
               </div>
               <div className="flex items-center space-x-2">
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setEditingCategory(category);
                     setCategoryForm({
                       name: category.name,
@@ -395,19 +399,21 @@ const MenuManagement = () => {
                   <Edit2 className="h-5 w-5" />
                 </button>
                 <button
-                  onClick={() => handleDeleteCategory(category.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteCategory(category.id);
+                  }}
                   className="text-red-400 hover:text-red-500 dark:hover:text-red-300"
                 >
                   <Trash2 className="h-5 w-5" />
                 </button>
               </div>
             </div>
-            <div className="divide-y divide-gray-200 dark:divide-gray-700">
-              {menuItems
-                .filter((item) => item.category_id === category.id)
-                .map((item) => {
-                  console.log('Rendering Item:', item.name, 'Price:', item.price); // Debug: Check price value
-                  return (
+            {expandedCategories[category.id] && (
+              <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                {menuItems
+                  .filter((item) => item.category_id === category.id)
+                  .map((item) => (
                     <div
                       key={item.id}
                       className="px-4 py-4 sm:px-6 flex items-center justify-between"
@@ -448,12 +454,11 @@ const MenuManagement = () => {
                             setFormData({
                               name: item.name,
                               description: item.description || '',
-                              price: item.price.toString(), // Ensure price is correctly populated
+                              price: item.price.toString(),
                               category_id: item.category_id,
                               image_url: item.image_url || '',
                               is_available: item.is_available,
                             });
-                            console.log('Form Data after setting:', formData); // Debug: Check form data
                             setIsModalOpen(true);
                           }}
                           className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
@@ -468,9 +473,9 @@ const MenuManagement = () => {
                         </button>
                       </div>
                     </div>
-                  );
-                })}
-            </div>
+                  ))}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -552,48 +557,48 @@ const MenuManagement = () => {
           </div>
 
           <div>
-    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-      Image
-    </label>
-    <input
-      type="file"
-      accept="image/*"
-      onChange={handleFileChange}
-      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-    />
-    {previewUrl && (
-      <div className="mt-2">
-        <img
-          src={previewUrl}
-          alt="Preview"
-          className="h-32 w-32 object-cover rounded"
-        />
-        <button
-          type="button"
-          onClick={handleRemoveImage}
-          className="mt-2 text-sm text-red-600 hover:text-red-800"
-        >
-          Remove image
-        </button>
-      </div>
-    )}
-    {editingItem?.image_url && !previewUrl && (
-      <div className="mt-2">
-        <img
-          src={editingItem.image_url}
-          alt="Current"
-          className="h-32 w-32 object-cover rounded"
-        />
-        <button
-          type="button"
-          onClick={handleRemoveImage}
-          className="mt-2 text-sm text-red-600 hover:text-red-800"
-        >
-          Remove image
-        </button>
-      </div>
-    )}
-  </div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Image
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            />
+            {previewUrl && (
+              <div className="mt-2">
+                <img
+                  src={previewUrl}
+                  alt="Preview"
+                  className="h-32 w-32 object-cover rounded"
+                />
+                <button
+                  type="button"
+                  onClick={handleRemoveImage}
+                  className="mt-2 text-sm text-red-600 hover:text-red-800"
+                >
+                  Remove image
+                </button>
+              </div>
+            )}
+            {editingItem?.image_url && !previewUrl && (
+              <div className="mt-2">
+                <img
+                  src={editingItem.image_url}
+                  alt="Current"
+                  className="h-32 w-32 object-cover rounded"
+                />
+                <button
+                  type="button"
+                  onClick={handleRemoveImage}
+                  className="mt-2 text-sm text-red-600 hover:text-red-800"
+                >
+                  Remove image
+                </button>
+              </div>
+            )}
+          </div>
 
           <div className="flex items-center">
             <input

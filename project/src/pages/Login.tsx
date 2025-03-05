@@ -14,7 +14,6 @@ const Login = () => {
   const { login, supabase } = useAuth();
   const navigate = useNavigate();
 
-  // Handle Google OAuth login
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     try {
@@ -28,7 +27,7 @@ const Login = () => {
       setTimeout(async () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          toast.success(`Welcome back, ${user.email}!`);
+          localStorage.setItem('toastMessage', `Welcome back, ${user.email}!`);
           navigate('/dashboard');
         }
       }, 2000);
@@ -53,7 +52,7 @@ const Login = () => {
         if (data?.user?.user_metadata?.role) {
           const role = data.user.user_metadata.role;
           const name = data.user.user_metadata.name;
-          toast.success(`Welcome back, ${role === 'admin' ? 'Admin' : role === 'chef' ? 'Chef' : 'Staff'} ${name}!`);
+          localStorage.setItem('toastMessage', `Welcome back, ${role === 'admin' ? 'Admin' : role === 'chef' ? 'Chef' : 'Staff'} ${name}!`);
         }
         navigate('/dashboard');
       } else {
@@ -62,7 +61,7 @@ const Login = () => {
         if (user?.user_metadata?.role) {
           const role = user.user_metadata.role;
           const name = user.user_metadata.name;
-          toast.success(`Welcome back, ${role === 'admin' ? 'Admin' : role === 'chef' ? 'Chef' : 'Staff'} ${name}!`);
+          localStorage.setItem('toastMessage', `Welcome back, ${role === 'admin' ? 'Admin' : role === 'chef' ? 'Chef' : 'Staff'} ${name}!`);
         }
         navigate('/dashboard');
       }
@@ -79,7 +78,6 @@ const Login = () => {
         <h2 className="text-3xl font-bold text-center text-gray-900 dark:text-white">Welcome Back</h2>
         <p className="text-center text-gray-600 dark:text-gray-400 mt-2">Sign in to continue</p>
 
-        {/* Google Login Button */}
         <button
           onClick={handleGoogleLogin}
           disabled={isLoading}

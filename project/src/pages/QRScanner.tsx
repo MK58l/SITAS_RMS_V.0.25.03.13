@@ -5,9 +5,11 @@ import { toast } from 'react-hot-toast';
 import PayPalButton from '../components/PayPalButton';
 import emailjs from '@emailjs/browser';
 import QRCode from 'react-qr-code';
+import { QrCode, ShoppingCart } from 'lucide-react';
 
 const QRScanner = () => {
   const { isAuthenticated, supabase, user } = useAuth();
+  const [scanning, setScanning] = useState(false);
   const [tableId, setTableId] = useState<string | null>(null);
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const [cart, setCart] = useState<any[]>([]);
@@ -48,6 +50,30 @@ const QRScanner = () => {
     fetchTablesAndCheckQR();
   }, []);
 
+  // Handle QR scan
+  const handleQRScan = async (qrData: { data: string }) => {
+    try {
+      // Extract table ID from QR code data
+      const tableNumber = qrData.data.split('_')[1];
+      
+      const { data, error } = await supabase
+        .from('tables')
+        .select('*')
+        .eq('table_number', tableNumber)
+        .single();
+
+      if (error) throw error;
+
+      setTableId(data.id);
+      setScanning(false);
+      toast.success(`Connected to Table ${data.table_number}`);
+    } catch (error) {
+      console.error('Error processing QR code:', error);
+      toast.error('Invalid QR code');
+      setScanning(false);
+    }
+  };
+
   // Handle table selection
   const handleTableSelection = (table: any) => {
     setTableId(table.id);
@@ -56,14 +82,21 @@ const QRScanner = () => {
     fetchMenuItems();
   };
 
-  // Fetch menu items
+  // Fetch menu items with categories
   const fetchMenuItems = async () => {
     try {
       const { data, error } = await supabase
         .from('menu_items')
-        .select('*')
-        .eq('is_available', true);
-      
+        .select(`
+          *,
+          category:category_id (
+            name,
+            sort_order
+          )
+        `)
+        .eq('is_available', true)
+        .order('category_id');
+
       if (error) throw error;
       setMenuItems(data || []);
     } catch (error) {
@@ -84,11 +117,12 @@ const QRScanner = () => {
   };
 
   // Update item quantity in cart
-  const updateQuantity = (itemId: number, delta: number) => {
+  const updateQuantity = (itemId: number, quantity: number) => {
+    if (quantity < 1) return;
     setCart(prev =>
       prev.map(item =>
         item.id === itemId
-          ? { ...item, quantity: Math.max(1, item.quantity + delta) }
+          ? { ...item, quantity }
           : item
       )
     );
@@ -230,7 +264,6 @@ const QRScanner = () => {
       });
   };
   
-  
   // Redirect to login if not authenticated
   if (!isAuthenticated) return <Navigate to="/login" />;
 
@@ -244,31 +277,53 @@ const QRScanner = () => {
                 Scan Table QR Code to Start Ordering
               </h2>
               
-              <div className="mt-8">
-                <h3 className="text-xl font-medium text-gray-900 mb-4">
-                  Available Tables
-                </h3>
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                  {tables.length > 0 ? (
-                    tables.map(table => (
-                      <div key={table.id} className="text-center">
-                        <div className="bg-white p-2 rounded-lg mb-2">
-                          <QRCode
-                            value={`${window.location.origin}/qr-scanner?table=${table.table_number}`}
-                            size={128}
-                          />
-                        </div>
-                        <button
-                          onClick={() => handleTableSelection(table)}
-                          className="btn-primary"
-                        >
-                          Table {table.table_number}
-                        </button>
-                      </div>
-                    ))
+              <div className="space-y-6">
+                <div className="border-4 border-dashed border-gray-200 rounded-lg h-64 flex items-center justify-center">
+                  {scanning ? (
+                    <div className="text-gray-500">Scanning...</div>
                   ) : (
-                    <p className="text-gray-500">No tables available</p>
+                    <button
+                      onClick={() => {
+                        setScanning(true);
+                        // Simulate QR scan for development
+                        setTimeout(() => {
+                          handleQRScan({ data: 'table_1' });
+                        }, 1000);
+                      }}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+                    >
+                      <QrCode className="h-5 w-5 mr-2" />
+                      Start Scanning
+                    </button>
                   )}
+                </div>
+
+                <div className="mt-8">
+                  <h3 className="text-xl font-medium text-gray-900 mb-4">
+                    Available Tables
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                    {tables.length > 0 ? (
+                      tables.map(table => (
+                        <div key={table.id} className="text-center">
+                          <div className="bg-white p-2 rounded-lg mb-2">
+                            <QRCode
+                              value={`${window.location.origin}/qr-scanner?table=${table.table_number}`}
+                              size={128}
+                            />
+                          </div>
+                          <button
+                            onClick={() => handleTableSelection(table)}
+                            className="btn-primary"
+                          >
+                            Table {table.table_number}
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-gray-500">No tables available</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -279,40 +334,53 @@ const QRScanner = () => {
             <div className="lg:col-span-2">
               <div className="bg-white shadow rounded-lg p-6">
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Menu</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {menuItems.length > 0 ? (
-                    menuItems.map(item => (
-                      <div key={item.id} className="border rounded-lg p-4">
-                        {item.image_url && (
-                          <img
-                            src={item.image_url}
-                            alt={item.name}
-                            className="w-full h-48 object-cover rounded-lg mb-4"
-                          />
-                        )}
-                        <h4 className="font-medium text-gray-900">{item.name}</h4>
-                        <p className="text-sm text-gray-500 mt-1">{item.description}</p>
-                        <div className="mt-4 flex items-center justify-between">
-                          <span className="font-bold">₹{item.price}</span>
-                          <button
-                            onClick={() => addToCart(item)}
-                            className="btn-primary"
-                          >
-                            Add to Cart
-                          </button>
+                
+                {/* Group menu items by category */}
+                {Object.entries(
+                  menuItems.reduce((acc, item) => {
+                    const category = item.category?.name || 'Other';
+                    if (!acc[category]) acc[category] = [];
+                    acc[category].push(item);
+                    return acc;
+                  }, {})
+                ).map(([category, items]) => (
+                  <div key={category} className="mb-8">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">{category}</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {items.map((item: any) => (
+                        <div key={item.id} className="border rounded-lg p-4">
+                          {item.image_url && (
+                            <img
+                              src={item.image_url}
+                              alt={item.name}
+                              className="w-full h-48 object-cover rounded-lg mb-4"
+                            />
+                          )}
+                          <h4 className="font-medium text-gray-900">{item.name}</h4>
+                          <p className="text-sm text-gray-500 mt-1">{item.description}</p>
+                          <div className="mt-4 flex items-center justify-between">
+                            <span className="font-bold">₹{item.price}</span>
+                            <button
+                              onClick={() => addToCart(item)}
+                              className="btn-primary"
+                            >
+                              Add to Cart
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-gray-500">No menu items available</p>
-                  )}
-                </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
             {/* Cart Section */}
             <div className="bg-white shadow rounded-lg p-6 h-fit sticky top-24">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Your Order</h2>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Your Order</h2>
+                <ShoppingCart className="h-6 w-6 text-gray-400" />
+              </div>
               <div className="space-y-4">
                 {cart.length > 0 ? (
                   cart.map(item => (
@@ -328,14 +396,14 @@ const QRScanner = () => {
                       </div>
                       <div className="flex items-center gap-3">
                         <button
-                          onClick={() => updateQuantity(item.id, -1)}
+                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
                           className="quantity-button"
                         >
                           -
                         </button>
                         <span>{item.quantity}</span>
                         <button
-                          onClick={() => updateQuantity(item.id, 1)}
+                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
                           className="quantity-button"
                         >
                           +

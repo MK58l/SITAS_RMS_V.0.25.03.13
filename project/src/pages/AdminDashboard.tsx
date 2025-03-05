@@ -5,6 +5,7 @@ import { BarChart3, Users, Table as TableIcon, DollarSign, Settings, UtensilsCro
 import RevenueChart from '../components/RevenueChart';
 import StaffManagement from '../components/StaffManagement';
 import MenuManagement from './admin/MenuManagement';
+import TableManagement from './admin/TableManagement';
 
 const AdminDashboard = () => {
   const { user, supabase } = useAuth();
@@ -29,11 +30,6 @@ const AdminDashboard = () => {
   useEffect(() => {
     fetchDashboardData();
   }, []);
-
-  // Log the tables state whenever it changes
-  useEffect(() => {
-    console.log('Tables state updated:', tables);
-  }, [tables]);
 
   const fetchDashboardData = async () => {
     try {
@@ -121,28 +117,6 @@ const AdminDashboard = () => {
     }
   };
 
-  const updateTableStatus = async (tableId, newStatus) => {
-    console.log('Updating table status:', tableId, newStatus); // Debugging line
-    try {
-      // Update the table status in the database
-      const { data, error } = await supabase
-        .from('tables')
-        .update({ status: newStatus })
-        .eq('id', tableId);
-
-      if (error) throw error;
-
-      // Update the local state immediately
-      setTables((prevTables) =>
-        prevTables.map((table) =>
-          table.id === tableId ? { ...table, status: newStatus } : table
-        )
-      );
-    } catch (error) {
-      console.error('Error updating table status:', error);
-    }
-  };
-
   if (!user || user.user_metadata.role !== 'admin') {
     return <Navigate to="/login" />;
   }
@@ -162,7 +136,7 @@ const AdminDashboard = () => {
 
         {/* Navigation Tabs */}
         <div className="border-b border-gray-200 dark:border-gray-700 mb-8">
-          <nav className="-mb-px flex space-x-8">
+          <nav className="-mb-px flex space-x-8 overflow-x-auto">
             <Link
               to="/admin"
               className={`${
@@ -295,42 +269,7 @@ const AdminDashboard = () => {
             </div>
           } />
           
-          <Route path="/tables" element={
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {tables.map((table: any) => (
-                <div key={table.id} className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
-                  <div className="px-4 py-5 sm:p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-medium text-gray-900 dark:text-white">Table {table.table_number}</h3>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        table.status === 'available' ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100' :
-                        table.status === 'occupied' ? 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100' :
-                        table.status === 'reserved' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100' :
-                        'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-100'
-                      }`}>
-                        {table.status}
-                      </span>
-                    </div>
-                    <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                      <p>Capacity: {table.capacity} people</p>
-                    </div>
-                    <div className="mt-4">
-                      <select
-                        value={table.status}
-                        onChange={(e) => updateTableStatus(table.id, e.target.value)}
-                        className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                      >
-                        <option value="available">Available</option>
-                        <option value="reserved">Reserved</option>
-                        <option value="occupied">Occupied</option>
-                        <option value="cleaning">Cleaning</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          } />
+          <Route path="/tables" element={<TableManagement />} />
         </Routes>
       </div>
     </div>

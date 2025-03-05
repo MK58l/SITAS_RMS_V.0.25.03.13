@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Plus, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import Modal from '../../components/Modal';
 import { toast } from 'react-hot-toast';
 
@@ -28,6 +28,7 @@ const MenuManagement = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [expandedCategories, setExpandedCategories] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     fetchCategories();
@@ -36,6 +37,7 @@ const MenuManagement = () => {
 
   const fetchCategories = async () => {
     try {
+      setIsLoading(true);
       const { data, error } = await supabase
         .from('menu_categories')
         .select('*')
@@ -46,11 +48,14 @@ const MenuManagement = () => {
     } catch (error) {
       console.error('Error fetching categories:', error);
       toast.error('Failed to fetch categories');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const fetchMenuItems = async () => {
     try {
+      setIsLoading(true);
       const { data, error } = await supabase
         .from('menu_items')
         .select('*')
@@ -61,17 +66,17 @@ const MenuManagement = () => {
     } catch (error) {
       console.error('Error fetching menu items:', error);
       toast.error('Failed to fetch menu items');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const formatPrice = (price) => {
-    const formattedPrice = new Intl.NumberFormat('en-IN', {
+    return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
       maximumFractionDigits: 0,
     }).format(price);
-
-    return formattedPrice;
   };
 
   const toggleCategory = (categoryId) => {
@@ -117,7 +122,6 @@ const MenuManagement = () => {
         sort_order: categories.length + 1,
       });
 
-      // Fetch updated categories
       await fetchCategories();
     } catch (error) {
       console.error('Error saving category:', error);
@@ -132,7 +136,6 @@ const MenuManagement = () => {
       if (!formData.price || isNaN(parseFloat(formData.price))) throw new Error('Valid price is required');
       if (!formData.category_id) throw new Error('Category is required');
 
-      // Verify category exists
       const { data: categoryExists } = await supabase
         .from('menu_categories')
         .select('id')
@@ -142,9 +145,7 @@ const MenuManagement = () => {
 
       let imageUrl = formData.image_url;
 
-      // Handle file upload/removal
       if (selectedFile) {
-        // Delete old image if editing
         if (editingItem?.image_url) {
           const oldImagePath = editingItem.image_url.split('/').pop();
           const { error: deleteError } = await supabase.storage
@@ -153,7 +154,6 @@ const MenuManagement = () => {
           if (deleteError) console.error('Error deleting old image:', deleteError);
         }
 
-        // Upload new image
         const fileName = `${Date.now()}_${selectedFile.name}`;
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('menu-items')
@@ -161,13 +161,11 @@ const MenuManagement = () => {
 
         if (uploadError) throw uploadError;
 
-        // Get public URL
         const { data: { publicUrl } } = supabase.storage
           .from('menu-items')
           .getPublicUrl(uploadData.path);
         imageUrl = publicUrl;
       } else if (editingItem && !formData.image_url && editingItem.image_url) {
-        // Handle image removal
         const oldImagePath = editingItem.image_url.split('/').pop();
         const { error: deleteError } = await supabase.storage
           .from('menu-items')
@@ -249,7 +247,6 @@ const MenuManagement = () => {
 
       if (error) throw error;
 
-      // Remove the deleted item from the local state
       setMenuItems((prevItems) => prevItems.filter((item) => item.id !== id));
       toast.success('Menu item deleted');
     } catch (error) {
@@ -259,15 +256,9 @@ const MenuManagement = () => {
   };
 
   const handleDeleteCategory = async (id) => {
-    if (
-      !confirm(
-        'Are you sure you want to delete this category? All menu items in this category will be deleted.'
-      )
-    )
-      return;
+    if (!confirm('Are you sure you want to delete this category? All menu items in this category will be deleted.')) return;
 
     try {
-      // First, delete all menu items in this category
       const { error: menuItemsError } = await supabase
         .from('menu_items')
         .delete()
@@ -275,7 +266,6 @@ const MenuManagement = () => {
 
       if (menuItemsError) throw menuItemsError;
 
-      // Then delete the category
       const { error: categoryError } = await supabase
         .from('menu_categories')
         .delete()
@@ -283,7 +273,6 @@ const MenuManagement = () => {
 
       if (categoryError) throw categoryError;
 
-      // Update local state
       setCategories((prevCategories) =>
         prevCategories.filter((category) => category.id !== id)
       );
@@ -307,7 +296,6 @@ const MenuManagement = () => {
 
       if (error) throw error;
 
-      // Update the local state immediately
       setMenuItems((prevItems) =>
         prevItems.map((item) =>
           item.id === id ? { ...item, is_available: !currentStatus } : item
@@ -321,7 +309,7 @@ const MenuManagement = () => {
     }
   };
 
-return (
+  return (
     <div className="container mx-auto px-4 py-8 pt-20">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -364,121 +352,132 @@ return (
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
-        {categories.map((category) => (
-          <div
-            key={category.id}
-            className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden"
-          >
+      {isLoading ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-6">
+          {categories.map((category) => (
             <div
-              className="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center cursor-pointer"
-              onClick={() => toggleCategory(category.id)}
+              key={category.id}
+              className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden"
             >
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                  {category.name}
-                </h3>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  {category.description}
-                </p>
+              <div
+                className="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center cursor-pointer"
+                onClick={() => toggleCategory(category.id)}
+              >
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                    {category.name}
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    {category.description}
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingCategory(category);
+                      setCategoryForm({
+                        name: category.name,
+                        description: category.description,
+                        sort_order: category.sort_order,
+                      });
+                      setIsCategoryModalOpen(true);
+                    }}
+                    className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                  >
+                    <Edit2 className="h-5 w-5" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteCategory(category.id);
+                    }}
+                    className="text-red-400 hover:text-red-500 dark:hover:text-red-300"
+                  >
+                    <Trash2 className="h-5 w-5" />
+                  </button>
+                  {expandedCategories[category.id] ? (
+                    <ChevronUp className="h-5 w-5 text-gray-400" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-gray-400" />
+                  )}
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setEditingCategory(category);
-                    setCategoryForm({
-                      name: category.name,
-                      description: category.description,
-                      sort_order: category.sort_order,
-                    });
-                    setIsCategoryModalOpen(true);
-                  }}
-                  className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
-                >
-                  <Edit2 className="h-5 w-5" />
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeleteCategory(category.id);
-                  }}
-                  className="text-red-400 hover:text-red-500 dark:hover:text-red-300"
-                >
-                  <Trash2 className="h-5 w-5" />
-                </button>
-              </div>
-            </div>
-            {expandedCategories[category.id] && (
-              <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                {menuItems
-                  .filter((item) => item.category_id === category.id)
-                  .map((item) => (
-                    <div
-                      key={item.id}
-                      className="px-4 py-4 sm:px-6 flex items-center justify-between"
-                    >
-                      <div className="flex items-center space-x-4">
-                        {item.image_url && (
-                          <img
-                            src={item.image_url}
-                            alt={item.name}
-                            className="h-12 w-12 rounded-full object-cover"
-                          />
-                        )}
-                        <div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-white">
-                            {item.name}
-                          </p>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {formatPrice(item.price)}
-                          </p>
+              {expandedCategories[category.id] && (
+                <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {menuItems
+                    .filter((item) => item.category_id === category.id)
+                    .map((item) => (
+                      <div
+                        key={item.id}
+                        className="px-4 py-4 sm:px-6 flex items-center justify-between"
+                      >
+                        <div className="flex items-center space-x-4">
+                          {item.image_url && (
+                            <img
+                              src={item.image_url}
+                              alt={item.name}
+                              className="h-12 w-12 rounded-full object-cover"
+                            />
+                          )}
+                          <div>
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">
+                              {item.name}
+                            </p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                              {formatPrice(item.price)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                          <button
+                            onClick={() =>
+                              toggleAvailability(item.id, item.is_available)
+                            }
+                            className={`px-3 py-1 rounded-full text-xs font-medium ${
+                              item.is_available
+                                ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100'
+                                : 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100'
+                            }`}
+                          >
+                            {item.is_available ? 'Available' : 'Unavailable'}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingItem(item);
+                              setFormData({
+                                name: item.name,
+                                description: item.description || '',
+                                price: item.price.toString(),
+                                category_id: item.category_id,
+                                image_url: item.image_url || '',
+                                is_available: item.is_available,
+                              });
+                              setIsModalOpen(true);
+                            }}
+                            className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                          >
+                            <Edit2 className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(item.id)}
+                            className="text-red-400 hover:text-red-500 dark:hover:text-red-300"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-4">
-                        <button
-                          onClick={() =>
-                            toggleAvailability(item.id, item.is_available)
-                          }
-                          className={`px-3 py-1 rounded-full text-xs font-medium ${
-                            item.is_available
-                              ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100'
-                              : 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100'
-                          }`}
-                        >
-                          {item.is_available ? 'Available' : 'Unavailable'}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditingItem(item);
-                            setFormData({
-                              name: item.name,
-                              description: item.description || '',
-                              price: item.price.toString(),
-                              category_id: item.category_id,
-                              image_url: item.image_url || '',
-                              is_available: item.is_available,
-                            });
-                            setIsModalOpen(true);
-                          }}
-                          className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
-                        >
-                          <Edit2 className="h-5 w-5" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          className="text-red-400 hover:text-red-500 dark:hover:text-red-300"
-                        >
-                          <Trash2 className="h-5 w-5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Menu Item Modal */}
       <Modal

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Menu, Home, User, LogOut, LogIn, UtensilsCrossed, ChevronDown } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
@@ -9,6 +9,7 @@ const Navbar = () => {
   const { user, logout, isAuthenticated } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = async () => {
     try {
@@ -28,6 +29,19 @@ const Navbar = () => {
     setIsDropdownOpen(!isDropdownOpen);
   };
 
+  // Check if the current route is /login or /register
+  const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
+
+  // Render only the ThemeToggle on /login and /register pages
+  if (isAuthPage) {
+    return (
+      <div className="fixed top-0 right-0 p-4 z-50">
+        <ThemeToggle />
+      </div>
+    );
+  }
+
+  // Render the full navbar for other pages
   return (
     <nav className="fixed top-0 left-0 w-full bg-white dark:bg-gray-800 shadow-lg z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

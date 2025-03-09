@@ -62,44 +62,35 @@ const TableManagement = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Generate QR code URL
-      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=table_${formData.table_number}`;
-      
+      const updateData = {
+        table_number: parseInt(formData.table_number),
+        capacity: parseInt(formData.capacity),
+        status: formData.status,
+        is_reserved: formData.status === 'reserved'
+      };
+
       let error;
       if (selectedTable) {
-        // Update existing table
         ({ error } = await supabase
           .from('tables')
-          .update({
-            table_number: parseInt(formData.table_number),
-            capacity: parseInt(formData.capacity),
-            status: formData.status
-          })
+          .update(updateData)
           .eq('id', selectedTable.id));
       } else {
-        // Create new table
+        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=table_${formData.table_number}`;
         ({ error } = await supabase
           .from('tables')
-          .insert([{
-            table_number: parseInt(formData.table_number),
-            capacity: parseInt(formData.capacity),
-            status: formData.status,
-            qr_code: qrCodeUrl,
-            is_reserved: formData.status === 'reserved'
-          }]));
+          .insert([{ ...updateData, qr_code: qrCodeUrl }]));
       }
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
 
       toast.success(selectedTable ? 'Table updated successfully' : 'Table added successfully');
       setIsModalOpen(false);
       setSelectedTable(null);
-      setFormData({
-        table_number: '',
-        capacity: 2,
-        status: 'available',
-      });
-      fetchTables();
+      await fetchTables();
     } catch (error) {
       console.error('Error saving table:', error);
       toast.error(error.message || 'Failed to save table');
@@ -123,7 +114,6 @@ const TableManagement = () => {
       toast.error('Failed to delete table');
     }
   };
-
   const handleViewReservations = (table) => {
     setSelectedTable(table);
     fetchReservations(table.id);
@@ -193,7 +183,10 @@ const TableManagement = () => {
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {tables.map(table => (
-          <div key={table.id} className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
+          <div 
+            key={`table-${table.id}-${table.status}`} 
+            className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden"
+          >
             <div className="p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white">Table {table.table_number}</h3>
@@ -328,7 +321,6 @@ const TableManagement = () => {
           </div>
         </form>
       </Modal>
-
       {/* View Reservations Modal */}
       <Modal
         isOpen={isViewReservationsModalOpen}

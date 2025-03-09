@@ -8,14 +8,14 @@ export default defineConfig({
   },
   server: {
     host: true,  // Ensure external access if needed
-    port: 5177,  // Set to 5173 as you want
+    port: 5173,  // Set to 5173 as you want
     strictPort: true,  // Ensures it uses the exact port
     hmr: {
       clientPort: 443,  // Custom HMR port
     },
   },
   preview: {
-    port: 5177,  // Ensure preview also runs on port 5173
+    port: 5173,  // Ensure preview also runs on port 5173
     strictPort: true,
     host: true,
   }

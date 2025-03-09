@@ -32,6 +32,17 @@
   animation: fade-in 0.2s ease-out;
 }
 
+.animate-ping {
+  animation: ping 1.5s cubic-bezier(0,0,0.2,1) infinite;
+}
+
+@keyframes ping {
+  90%, 100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
 /* Custom scrollbar for webkit browsers */
 ::-webkit-scrollbar {
   width: 8px;

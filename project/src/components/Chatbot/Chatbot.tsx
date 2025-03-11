@@ -1,11 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { MessageCircle, X } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const Chatbot: React.FC = () => {
+  const { isAuthenticated, user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (!isAuthenticated || user?.user_metadata?.role !== 'customer') return;
+
     const script = document.createElement('script');
     script.src = "https://www.chatbase.co/embed.min.js";
     script.defer = true;
@@ -14,11 +18,14 @@ export const Chatbot: React.FC = () => {
     return () => {
       document.head.removeChild(script);
     };
-  }, []);
+  }, [isAuthenticated, user]); // Re-run when auth status or user changes
 
   const handleIframeLoad = () => {
     setIsLoading(false);
   };
+
+  // Only show to authenticated customers
+  if (!isAuthenticated || user?.user_metadata?.role !== 'customer') return null;
 
   return (
     <div className="fixed bottom-8 right-8 z-[1000]">

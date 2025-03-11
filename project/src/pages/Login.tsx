@@ -14,29 +14,32 @@ const Login = () => {
   const { login, supabase } = useAuth();
   const navigate = useNavigate();
 
-  const handleGoogleLogin = async () => {
-    setIsLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { scopes: 'email profile openid' },
-      });
+const handleGoogleLogin = async () => {
+  setIsLoading(true);
+  try {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        scopes: 'email profile openid',
+        redirectTo: 'https://devanshi-dhabalia2003-rms-updated-2402.vercel.app/dashboard', // Update this URL
+      },
+    });
 
-      if (error) throw error;
+    if (error) throw error;
 
-      setTimeout(async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          localStorage.setItem('toastMessage', `Welcome back, ${user.email}!`);
-          navigate('/dashboard');
-        }
-      }, 2000);
+    setTimeout(async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        localStorage.setItem('toastMessage', `Welcome back, ${user.email}!`);
+        navigate('/dashboard');
+      }
+    }, 2000);
 
-    } catch (error) {
-      toast.error(error.message || 'Failed to login with Google');
-      setIsLoading(false);
-    }
-  };
+  } catch (error) {
+    toast.error(error.message || 'Failed to login with Google');
+    setIsLoading(false);
+  }
+};
 
   const handleSubmit = async (e) => {
     e.preventDefault();

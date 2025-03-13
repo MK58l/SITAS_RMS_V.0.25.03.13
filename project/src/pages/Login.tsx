@@ -21,7 +21,7 @@ const handleGoogleLogin = async () => {
       provider: 'google',
       options: {
         scopes: 'email profile openid',
-        redirectTo: 'https://devanshi-dhabalia2003-rms-updated-2402.vercel.app/dashboard', // Update this URL
+        redirectTo: 'https://sitas-rms-v-0-25-03-13.vercel.app//dashboard', // Update this URL
       },
     });
 
